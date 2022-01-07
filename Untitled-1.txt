@@ -1,0 +1,1 @@
+https://stackoverflow.com/questions/53286828/how-to-get-browser-network-logs-using-python-selenium

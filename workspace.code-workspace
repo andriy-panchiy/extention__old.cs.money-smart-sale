@@ -1,0 +1,26 @@
+{
+	"folders": [
+		{
+			"path": "E:\\programming\\github\\csgo-price-parser"
+		},
+		{
+			"path": "..\\..\\..\\..\\my\\bot"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "..\\SSoW v2"
+		},
+		{
+			"path": "..\\project"
+		},
+		{
+			"path": "..\\..\\..\\..\\my\\babies"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "project",
+		"compile-hero.disable-compile-files-on-did-save-code": false
+	}
+}
