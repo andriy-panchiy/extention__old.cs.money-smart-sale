@@ -85,7 +85,7 @@ function MainScript() {
 
                     let id = Object.keys(sortedObj)[0];
                     let options = sortedObj[id];
-                    console.dir(`time: ${currentTime}, stepTime: ${options.stepDate}, bool: ${currentTime >= options.stepDate}`);
+                    // console.dir(`time: ${currentTime}, stepTime: ${options.stepDate}, bool: ${currentTime >= options.stepDate}`);
                     if (currentTime >= options.stepDate && currentTime <= options.endDate && options.step <= options.steps) {
                         self.changePrice(id, options);
                     }
@@ -96,36 +96,40 @@ function MainScript() {
                 let item = self.userInventory?.filter(elem => elem.id == id)?.[0];
                 if (item) {
                     let new_price = item.cp - options.stepPrice;
-                    request.post("/edit_price", {
-                        "peopleItems":[{
-                            "assetid": item.id[0],
-                            "local_price": item.p,
-                            "price": item.p,
-                            "hold_time": null,
-                            "market_hash_name": skinsBaseList[self.appID][item.o].m,
-                            "bot": item.bi[0],
-                            "reality":"virtual",
-                            "currency":"USD",
-                            "username": username,
-                            "appid": self.appID,
-                            "name_id": item.o,
-                            "float": item?.f[0],
-                            "stickers_count": 0,
-                            "custom_price": new_price,
-                            "commission": 5
-                        }],
-                        "botItems":[],
-                        "onWallet":new_price
-                    }, function(err, res) {
-                        if (err || !res) {
-                            return;
-                        }
-                        if (res.success) {
-                            options.step++;
-                            options.stepDate = self.getNextStepTime(options.startDate, options.endDate, options.step, options.steps);
-                            self.updateSmartSale(id, options);
-                        }
-                    });
+                    if (new_price >= options.endBefore) {
+                        request.post("/edit_price", {
+                            "peopleItems":[{
+                                "assetid": item.id[0],
+                                "local_price": item.p,
+                                "price": item.p,
+                                "hold_time": null,
+                                "market_hash_name": skinsBaseList[self.appID][item.o].m,
+                                "bot": item.bi[0],
+                                "reality":"virtual",
+                                "currency":"USD",
+                                "username": username,
+                                "appid": self.appID,
+                                "name_id": item.o,
+                                "float": item?.f[0],
+                                "stickers_count": 0,
+                                "custom_price": new_price,
+                                "commission": 5
+                            }],
+                            "botItems":[],
+                            "onWallet":new_price
+                        }, function(err, res) {
+                            if (err || !res) {
+                                return;
+                            }
+                            if (res.success) {
+                                options.step++;
+                                options.stepDate = self.getNextStepTime(options.startDate, options.endDate, options.step, options.steps);
+                                self.updateSmartSale(id, options);
+                            }
+                        });
+                    } else {
+                        console.error('New_price is lower then price in options')
+                    }
                 }
             },
             changeStep: function() {
@@ -327,11 +331,11 @@ function MainScript() {
                 });
                 $(".items").on("click", ".item", (e) => {
                     self.currentContainer = e.target.closest('.items').parentElement.id;
+                    self.updateCurrentItemsId();
                     if (self.currentContainer.includes('offer')) {
-                        self.updateCurrentItemsId();
                         self.updateInputs(self.offerItemsList[self.selectedItemsId[0]]);
                     } else {
-                        self.updateInputs(self.cleanOptions);
+                        self.updateInputs(self.onSale[self.selectedItemsId[0]] || self.cleanOptions);
                     }
 
                     let market_price_input = document.querySelector(".market_price_input");
