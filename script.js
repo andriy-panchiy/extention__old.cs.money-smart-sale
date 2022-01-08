@@ -23,13 +23,13 @@ localStorage.extensionID = chrome.runtime.id;
 
 function MainScript() {
     function my_init() {
+        console.clear();
         console.dir("CSM SmartSale Init");
-        var csmoneySmartSale = {
+        window.csmoneySmartSale = {
             init: function(config) {
                 let self = this;
                 self.sell_mode        = false;
                 self.appID            = inventoriesList.user.appID;
-                self.items_status     = 'Not on sale';
                 self.MILLISECONDS     = 1000;
                 self.MINUTES          = 60;
                 self.HOURS            = 60;
@@ -38,13 +38,23 @@ function MainScript() {
                 self.tomorrow         = new Date(self.currentDate.getTime() + self.DAYS * self.HOURS * self.MINUTES * self.MILLISECONDS);
                 self.currentItems     = [];
                 self.offerItemsList   = {};
-                self.offerItemsListId = [];
                 self.userInventory    = [];
                 self.defaultCommision = 100 - dataSellInputs.percent * 100;
                 self.maxCommision     = 25;
                 self.currentCommision = null;
                 self.extensionID      = localStorage.extensionID;
-                self.onSale           = self.getSmartSale();
+                self.onSale           = self.getSmartSale() || [];
+                self.cleanOptions = {
+                    startDate  : self.currentDate.getTime(),
+                    endDate    : self.tomorrow.getTime(),
+                    stepDate   : null,
+                    stepTime   : null,
+                    step       : 1,
+                    steps      : 1,
+                    stepPrice  : null,
+                    startBefore: null,
+                    endBefore  : null
+                }
                 self.loadInventory();
                 setInterval(() => {
                     self.checkResalePrice();
@@ -68,6 +78,7 @@ function MainScript() {
             checkResalePrice: function() {
                 let self = this;
                 self.onSale = self.getSmartSale();
+
                 if (self.onSale) {
                     let currentTime = new Date().getTime();
                     let sortedMap = self.sort(self.onSale, val => val.stepDate);
@@ -76,6 +87,7 @@ function MainScript() {
 
                     let id = Object.keys(sortedObj)[0];
                     let options = sortedObj[id];
+                    console.log(options);
                     if (currentTime >= options.startDate && currentTime >= options.stepDate && currentTime <= options.endDate && options.step <= options.steps) {
                         self.changePrice(id, options);
                     }
@@ -87,25 +99,23 @@ function MainScript() {
                 if (item) {
                     let new_price = item.cp - options.stepPrice;
                     request.post("/edit_price", {
-                        "peopleItems":[
-                            {
-                                "assetid": item.ai[0],
-                                "local_price": item.p,
-                                "price": item.p,
-                                "hold_time":null,
-                                "market_hash_name": skinsBaseList[self.appID][item.o].m,
-                                "bot": item.bi[0],
-                                "reality":"virtual",
-                                "currency":"USD",
-                                "username": username,
-                                "appid": self.appID,
-                                "name_id": item.o,
-                                "float": item?.f[0],
-                                "stickers_count":0,
-                                "custom_price": new_price,
-                                "commission":5
-                            }
-                        ],
+                        "peopleItems":[{
+                            "assetid": item.ai[0],
+                            "local_price": item.p,
+                            "price": item.p,
+                            "hold_time": null,
+                            "market_hash_name": skinsBaseList[self.appID][item.o].m,
+                            "bot": item.bi[0],
+                            "reality":"virtual",
+                            "currency":"USD",
+                            "username": username,
+                            "appid": self.appID,
+                            "name_id": item.o,
+                            "float": item?.f[0],
+                            "stickers_count": 0,
+                            "custom_price": new_price,
+                            "commission": 5
+                        }],
                         "botItems":[],
                         "onWallet":new_price
                     }, function(err, res) {
@@ -114,7 +124,7 @@ function MainScript() {
                         }
                         if (res.success) {
                             options.step++;
-                            options.stepDate += options.timePerStep;
+                            options.stepDate += options.stepTime;
                             self.updateSmartSale(id, options);
                         }
                     });
@@ -148,21 +158,15 @@ function MainScript() {
                     self.changeStepPrice();
                 }
             },
+            // TODO: fix reverse commission
             getCommision: function(){
                 let self = this;
                 self.updateCurrentItems();
                 for (let currentItem of self.currentItems){
-                    if (currentItem.params?.pop) {
-                        let Commision = +((endBefore.value - currentItem.params.p / 0.95) / endBefore.value * 100 / 2).toFixed(2);
-                        if (Commision <= self.defaultCommision) {
-                            self.currentCommision = self.defaultCommision;
-                        } else if (Commision >= self.maxCommision) {
-                            self.currentCommision = self.maxCommision;
-                        } else {
-                            self.currentCommision = Commision;
-                        }
-                    } else {
-                        self.currentCommision = self.defaultCommision;
+                    let Commision = +((endBefore.value - currentItem.params.p / 0.95) / endBefore.value * 100 / 2).toFixed(2);
+                    self.currentCommision = self.defaultCommision;
+                    if (currentItem.params?.pop && Commision > self.defaultCommision) {
+                        self.currentCommision = Commision > self.maxCommision ? self.maxCommision : Commision;
                     }
                 }
                 return self.currentCommision;
@@ -175,8 +179,9 @@ function MainScript() {
                 let self = this;
                 return +(from.value / 100 * (100 - self.getCommision())).toFixed(2);
             },
-            updateMenuValue: function({ startDate, endDate, startBefore, endBefore, steps, stepPrice }){
+            updateMenuValue: function(){
                 let self = this;
+                let { startDate, endDate, startBefore, endBefore, steps, stepPrice } = self.selectedItem;
                 document.querySelector("#startDate").value   = self.transformToISO(startDate || self.currentDate);
                 document.querySelector("#endDate").value     = self.transformToISO(endDate || self.tomorrow);
                 document.querySelector("#startBefore").value = startBefore;
@@ -191,31 +196,39 @@ function MainScript() {
             updateCurrentItemsId: function(){
                 let self = this;
                 self.updateCurrentItems();
-                self.offerItemsListId = [].concat(...self.currentItems.map(v => v.params.id))
+                self.selectedItemsId = [].concat(...self.currentItems.map(v => v.params.id));
             },
-            updateMenu: function(){
+            updateOfferMenu: function(option){
                 let self = this;
-                self.updateCurrentItemsId();
-                self.selectedItem = self.offerItemsList?.[self.offerItemsListId[0]];
-                self.updateMenuValue(self.selectedItem || { startDate: null, endDate: null, startBefore: null, endBefore: null, steps: 1, stepPrice: null });
-            },
-            updateParamsCurrentItems: function(){
-                let self = this;
-                self.updateCurrentItemsId();
-                for (let offerItemsId of self.offerItemsListId){
-                    self.offerItemsList[offerItemsId] = {
-                        startDate  : new Date(startDate.value).getTime(),
-                        endDate    : new Date(endDate.value).getTime(),
-                        stepDate   : new Date(new Date(startDate.value).getTime() + self.getDaysDiff(startDate.value, endDate.value) / +steps.value).getTime(),
-                        timePerStep: Math.round(self.getDaysDiff(startDate.value, endDate.value) / +steps.value),
-                        step       : 1,
-                        steps      : Number(steps.value),
-                        stepPrice  : Number(stepPrice.value),
-                        startBefore: Number(startBefore.value),
-                        endBefore  : Number(endBefore.value),
+                for (let selectedItemId of self.selectedItemsId){
+                    if (option === 'add') {
+                        self.offerItemsList[selectedItemId] = self.getCurrentInputs();
+                    } else {
+                        delete self.offerItemsList[selectedItemId];
                     }
                 }
-                self.updateMenu();
+                self.updateCurrentItemsId();
+                self.updateInputs(self.cleanOptions);
+            },
+            getCurrentInputs: function(){
+                let self = this;
+                return {
+                    startDate  : new Date(startDate.value).getTime(),
+                    endDate    : new Date(endDate.value).getTime(),
+                    stepDate   : new Date(new Date(startDate.value).getTime() + self.getDaysDiff(startDate.value, endDate.value) / +steps.value).getTime(),
+                    stepTime   : Math.round(self.getDaysDiff(startDate.value, endDate.value) / +steps.value),
+                    step       : 1,
+                    steps      : Number(steps.value),
+                    stepPrice  : Number(stepPrice.value),
+                    startBefore: Number(startBefore.value),
+                    endBefore  : Number(endBefore.value),
+                }
+            },
+            updateInputs: function(options){
+                let self = this;
+                self.updateCurrentItemsId();
+                self.selectedItem = options || self.getCurrentInputs();
+                self.updateMenuValue();
             },
             doFakeClick: function(element){
                 let dispatchMouseEvent = function(target, var_args) {
@@ -304,15 +317,22 @@ function MainScript() {
                             break;
                     }
                     if (id !== "stepPrice") self.changeStepPrice();
-                    self.updateParamsCurrentItems();
+                    self.updateInputs();
                 });
                 $(".SmartSale input").on("keydown", (e) => !(e.key.length == 1 && e.key.match(/[^0-9'".]/)));
                 $(".SmartSale [type='date']").on("change", function(){
                     self.changeDaysDiff();
-                    self.updateParamsCurrentItems();
+                    self.updateInputs();
                 });
-                $(".items").on("click", ".item", () => {
-                    self.updateParamsCurrentItems();
+                $(".items").on("click", ".item", (e) => {
+                    self.currentContainer = e.target.closest('.items').parentElement.id;
+                    if (self.currentContainer.includes('offer')) {
+                        self.updateCurrentItemsId();
+                        self.updateInputs(self.offerItemsList[self.selectedItemsId[0]]);
+                    } else {
+                        self.updateInputs(self.cleanOptions);
+                    }
+
                     let market_price_input = document.querySelector(".market_price_input");
                     market_price_input.addEventListener("keyup", function(event) {
                         if (event.keyCode === 13) {
@@ -322,10 +342,14 @@ function MainScript() {
                     });
                     market_price_input.select();
                 });
+                $('.button_add_sell_list').on('click', function(e) {
+                    self.updateOfferMenu(self.currentContainer.includes('offer') ? 'delete' : 'add');
+                });
             },
             setSmartSale: function(){
                 let self = this;
                 localStorage.SmartSale = JSON.stringify({ ...self.getSmartSale(), ...self.offerItemsList });
+                self.offerItemsList = {};
             },
             updateSmartSale: function(id, options){
                 let self = this;
