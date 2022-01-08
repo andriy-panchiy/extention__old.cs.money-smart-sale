@@ -78,7 +78,6 @@ function MainScript() {
             checkResalePrice: function() {
                 let self = this;
                 self.onSale = self.getSmartSale();
-
                 if (self.onSale) {
                     let currentTime = new Date().getTime();
                     let sortedMap = self.sort(self.onSale, val => val.stepDate);
@@ -86,9 +85,9 @@ function MainScript() {
                     sortedMap.forEach((v,k) => { sortedObj[k] = v });
 
                     let id = Object.keys(sortedObj)[0];
-                    let options = sortedObj[id];
-                    console.log(options);
-                    if (currentTime >= options.startDate && currentTime >= options.stepDate && currentTime <= options.endDate && options.step <= options.steps) {
+                    let { endDate, step, stepDate, steps } = sortedObj[id];
+                    console.dir(`time: ${currentTime}, stepTime: ${stepDate}, bool: ${currentTime >= stepDate}`);
+                    if (currentTime >= stepDate && currentTime <= endDate && step <= steps) {
                         self.changePrice(id, options);
                     }
                 }
@@ -124,7 +123,7 @@ function MainScript() {
                         }
                         if (res.success) {
                             options.step++;
-                            options.stepDate += options.stepTime;
+                            options.stepDate = self.getNextStepTime(options.startDate, endDate.endDate, options.step, options.steps);
                             self.updateSmartSale(id, options);
                         }
                     });
@@ -210,13 +209,17 @@ function MainScript() {
                 self.updateCurrentItemsId();
                 self.updateInputs(self.cleanOptions);
             },
+            getNextStepTime: function(startDate, endDate, currentStep, steps){
+                let self = this;
+                return Math.round((self.getDaysDiff(startDate, endDate) * currentStep) / steps);
+            },
             getCurrentInputs: function(){
                 let self = this;
                 return {
                     startDate  : new Date(startDate.value).getTime(),
                     endDate    : new Date(endDate.value).getTime(),
                     stepDate   : new Date(new Date(startDate.value).getTime() + self.getDaysDiff(startDate.value, endDate.value) / +steps.value).getTime(),
-                    stepTime   : Math.round(self.getDaysDiff(startDate.value, endDate.value) / +steps.value),
+                    stepTime   : self.getNextStepTime(startDate.value, endDate.value, 1, +steps.value),
                     step       : 1,
                     steps      : Number(steps.value),
                     stepPrice  : Number(stepPrice.value),
