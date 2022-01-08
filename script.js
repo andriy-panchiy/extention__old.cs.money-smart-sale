@@ -217,7 +217,7 @@ function MainScript() {
                 let getDaysDiff = self.getDaysDiff(startDate, endDate);
                 if (!getDaysDiff) return endDate;
                 let stepTime = startDate + Math.round(getDaysDiff / steps * currentStep);
-                return endDate > stepTime ? endDate : stepTime;
+                return endDate < stepTime ? endDate : stepTime;
             },
             getCurrentInputs: function(){
                 let self = this;
