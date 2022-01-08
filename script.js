@@ -134,11 +134,11 @@ function MainScript() {
             },
             changeStep: function() {
                 let self = this;
-                steps.value = Math.floor((+$(".market_price_input").val() - +endBefore.value) / +stepPrice.value);
+                steps.value = Math.floor((+document.querySelector('.market_price_input').value - +endBefore.value) / +stepPrice.value);
             },
             changeStepPrice: function() {
                 let self = this;
-                stepPrice.value = +((+$(".market_price_input").val() - +endBefore.value) / +steps.value).toFixed(2);
+                stepPrice.value = +((+document.querySelector('.market_price_input').value - +endBefore.value) / +steps.value).toFixed(2);
             },
             getDaysDiff: function(start, end){
                 let self = this;
@@ -214,14 +214,17 @@ function MainScript() {
             },
             getNextStepTime: function(startDate, endDate, currentStep, steps){
                 let self = this;
-                return startDate + Math.round(self.getDaysDiff(startDate, endDate) / steps * currentStep);
+                let getDaysDiff = self.getDaysDiff(startDate, endDate);
+                if (!getDaysDiff) return endDate;
+                let stepTime = startDate + Math.round(getDaysDiff / steps * currentStep);
+                return endDate > stepTime ? endDate : stepTime;
             },
             getCurrentInputs: function(){
                 let self = this;
                 return {
                     startDate  : new Date(startDate.value).getTime(),
                     endDate    : new Date(endDate.value).getTime(),
-                    stepDate   : self.getNextStepTime(startDate.value, endDate.value, 1, +steps.value),
+                    stepDate   : self.getNextStepTime(new Date(startDate.value).getTime(), new Date(endDate.value).getTime(), 1, +steps.value),
                     step       : 1,
                     steps      : Number(steps.value),
                     stepPrice  : Number(stepPrice.value),
@@ -296,59 +299,72 @@ function MainScript() {
                         <div class="market_price_text">steps cost</div>
                     </div>
                 </div>`;
-                $(".market_price")[0].appendChild(market_days_container);
+                document.querySelector('.market_price').appendChild(market_days_container);
                 self.changeDaysDiff();
                 self.buildMenuEvents();
             },
             destroyMenu: function(){
                 let self = this;
-                $(".SmartSale").remove();
+                document.querySelector('.SmartSale').remove();
             },
             buildMenuEvents: function(){
                 let self = this;
-                $(".market_price input").on("keyup", (e) => {
-                    let { id } = e.target;
-                    switch (id) {
-                        case "startBefore":
-                            endBefore.value = self.getPercent(startBefore);
-                            break;
-                        case "endBefore":
-                            startBefore.value = self.getBackPercent(endBefore);
-                            break;
-                        case "stepPrice":
-                            self.changeStep();
-                            break;
-                        default:
-                            break;
-                    }
-                    if (id !== "stepPrice") self.changeStepPrice();
-                    self.updateInputs();
-                });
-                $(".SmartSale input").on("keydown", (e) => !(e.key.length == 1 && e.key.match(/[^0-9'".]/)));
-                $(".SmartSale [type='date']").on("change", function(){
-                    self.changeDaysDiff();
-                    self.updateInputs();
-                });
-                $(".items").on("click", ".item", (e) => {
-                    self.currentContainer = e.target.closest('.items').parentElement.id;
-                    self.updateCurrentItemsId();
-                    if (self.currentContainer.includes('offer')) {
-                        self.updateInputs(self.offerItemsList[self.selectedItemsId[0]]);
-                    } else {
-                        self.updateInputs(self.onSale[self.selectedItemsId[0]] || self.cleanOptions);
-                    }
-
-                    let market_price_input = document.querySelector(".market_price_input");
-                    market_price_input.addEventListener("keyup", function(event) {
-                        if (event.keyCode === 13) {
-                            event.preventDefault();
-                            self.doFakeClick(MODE.addCancelSellModeButton);
+                let column_1 = document.querySelector('.column_1'),
+                    column_2 = document.querySelector('.column_2');
+                column_2.addEventListener('keyup', function(e){
+                    if (e.target.nodeName == 'INPUT') {
+                        let { id } = e.target;
+                        switch (id) {
+                            case "startBefore":
+                                endBefore.value = self.getPercent(startBefore);
+                                break;
+                            case "endBefore":
+                                startBefore.value = self.getBackPercent(endBefore);
+                                break;
+                            case "stepPrice":
+                                self.changeStep();
+                                break;
+                            default:
+                                break;
                         }
-                    });
-                    market_price_input.select();
+                        if (id !== "stepPrice") self.changeStepPrice();
+                        self.updateInputs();
+                    }
                 });
-                $('.button_add_sell_list').on('click', function(e) {
-                    self.updateOfferMenu(self.currentContainer.includes('offer') ? 'delete' : 'add');
+                column_2.addEventListener('keydown', function(e){
+                    if (e.target.nodeName == 'INPUT' && e.target.type == 'text') {
+                        return !(e.key.length == 1 && e.key.match(/[^0-9'".]/));
+                    }
+                });
+                column_2.addEventListener('change', function(e){
+                    if (e.target.nodeName == 'INPUT' && e.target.type == 'date') {
+                        self.changeDaysDiff();
+                        self.updateInputs();
+                    }
+                });
+                column_1.addEventListener('click', function(e) {
+                    if (e.target.closest('.item')) {
+                        self.currentContainer = e.target.closest('.items').parentElement.id;
+                        self.updateCurrentItemsId();
+                        if (self.currentContainer.includes('offer')) {
+                            self.updateInputs(self.offerItemsList[self.selectedItemsId[0]]);
+                        } else {
+                            self.updateInputs(self.onSale[self.selectedItemsId[0]] || self.cleanOptions);
+                        }
+                        let market_price_input = document.querySelector(".market_price_input");
+                        market_price_input.addEventListener("keyup", function(event) {
+                            if (event.keyCode === 13) {
+                                event.preventDefault();
+                                self.doFakeClick(MODE.addCancelSellModeButton);
+                            }
+                        });
+                        market_price_input.select();
+                    }
+                });
+                column_2.addEventListener('click', function(e){
+                    if (e.target.classList.contains('button_add_sell_list')) {
+                        self.updateOfferMenu(self.currentContainer.includes('offer') ? 'delete' : 'add');
+                    }
                 });
             },
             setSmartSale: function(){
