@@ -48,7 +48,6 @@ function MainScript() {
                     startDate  : self.currentDate.getTime(),
                     endDate    : self.tomorrow.getTime(),
                     stepDate   : null,
-                    stepTime   : null,
                     step       : 1,
                     steps      : 1,
                     stepPrice  : null,
@@ -58,7 +57,7 @@ function MainScript() {
                 self.loadInventory();
                 setInterval(() => {
                     self.checkResalePrice();
-                }, 1000);
+                }, 10000);
             },
             sort: function(obj,valSelector) {
                 let self = this;
@@ -85,9 +84,9 @@ function MainScript() {
                     sortedMap.forEach((v,k) => { sortedObj[k] = v });
 
                     let id = Object.keys(sortedObj)[0];
-                    let { endDate, step, stepDate, steps } = sortedObj[id];
-                    console.dir(`time: ${currentTime}, stepTime: ${stepDate}, bool: ${currentTime >= stepDate}`);
-                    if (currentTime >= stepDate && currentTime <= endDate && step <= steps) {
+                    let options = sortedObj[id];
+                    console.dir(`time: ${currentTime}, stepTime: ${options.stepDate}, bool: ${currentTime >= options.stepDate}`);
+                    if (currentTime >= options.stepDate && currentTime <= options.endDate && options.step <= options.steps) {
                         self.changePrice(id, options);
                     }
                 }
@@ -99,7 +98,7 @@ function MainScript() {
                     let new_price = item.cp - options.stepPrice;
                     request.post("/edit_price", {
                         "peopleItems":[{
-                            "assetid": item.ai[0],
+                            "assetid": item.id[0],
                             "local_price": item.p,
                             "price": item.p,
                             "hold_time": null,
@@ -123,7 +122,7 @@ function MainScript() {
                         }
                         if (res.success) {
                             options.step++;
-                            options.stepDate = self.getNextStepTime(options.startDate, endDate.endDate, options.step, options.steps);
+                            options.stepDate = self.getNextStepTime(options.startDate, options.endDate, options.step, options.steps);
                             self.updateSmartSale(id, options);
                         }
                     });
@@ -211,15 +210,14 @@ function MainScript() {
             },
             getNextStepTime: function(startDate, endDate, currentStep, steps){
                 let self = this;
-                return Math.round((self.getDaysDiff(startDate, endDate) * currentStep) / steps);
+                return startDate + Math.round(self.getDaysDiff(startDate, endDate) / steps * currentStep);
             },
             getCurrentInputs: function(){
                 let self = this;
                 return {
                     startDate  : new Date(startDate.value).getTime(),
                     endDate    : new Date(endDate.value).getTime(),
-                    stepDate   : new Date(new Date(startDate.value).getTime() + self.getDaysDiff(startDate.value, endDate.value) / +steps.value).getTime(),
-                    stepTime   : self.getNextStepTime(startDate.value, endDate.value, 1, +steps.value),
+                    stepDate   : self.getNextStepTime(startDate.value, endDate.value, 1, +steps.value),
                     step       : 1,
                     steps      : Number(steps.value),
                     stepPrice  : Number(stepPrice.value),
