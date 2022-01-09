@@ -86,8 +86,11 @@ function MainScript() {
                     let id = Object.keys(sortedObj)[0];
                     let options = sortedObj[id];
                     // console.dir(`time: ${currentTime}, stepTime: ${options.stepDate}, bool: ${currentTime >= options.stepDate}`);
-                    if (currentTime >= options.stepDate && currentTime <= options.endDate && options.step <= options.steps) {
+                    if (currentTime >= options.stepDate && currentTime <= options.endDate && options.step < options.steps) {
                         self.changePrice(id, options);
+                    }
+                    if (options.step >= options.steps) {
+                        self.updateSmartSale('delete', id)
                     }
                 }
             },
@@ -124,7 +127,7 @@ function MainScript() {
                             if (res.success) {
                                 options.step++;
                                 options.stepDate = self.getNextStepTime(options.startDate, options.endDate, options.step, options.steps);
-                                self.updateSmartSale(id, options);
+                                self.updateSmartSale('add', id, options);
                             }
                         });
                     } else {
@@ -372,10 +375,14 @@ function MainScript() {
                 localStorage.SmartSale = JSON.stringify({ ...self.getSmartSale(), ...self.offerItemsList });
                 self.offerItemsList = {};
             },
-            updateSmartSale: function(id, options){
+            updateSmartSale: function(state, id, options){
                 let self = this;
                 self.onSale = self.getSmartSale();
-                self.onSale[id] = options;
+                if (state == 'add') {
+                    self.onSale[id] = options;
+                } else {
+                    delete self.onSale[id];
+                }
                 localStorage.SmartSale = JSON.stringify(self.onSale);
             },
             getSmartSale: function(){
