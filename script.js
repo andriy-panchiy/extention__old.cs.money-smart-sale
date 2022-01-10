@@ -59,14 +59,6 @@ function MainScript() {
                     self.checkResalePrice();
                 }, 10000);
             },
-            sort: function(obj,valSelector) {
-                let self = this;
-                const sortedEntries = Object.entries(obj)
-                    .sort((a, b) =>
-                        valSelector(a[1]) > valSelector(b[1]) ? 1 :
-                        valSelector(a[1]) < valSelector(b[1]) ? -1 : 0);
-                return new Map(sortedEntries);
-            },
             loadInventory: function(){
                 let self = this;
                 request.get("/730/load_user_inventory", function(err, res) {
@@ -79,12 +71,8 @@ function MainScript() {
                 self.onSale = self.getSmartSale();
                 if (self.onSale) {
                     let currentTime = new Date().getTime();
-                    let sortedMap = self.sort(self.onSale, val => val.stepDate);
-                    let sortedObj = {};
-                    sortedMap.forEach((v,k) => { sortedObj[k] = v });
+                    let [id, options] = Object.entries(self.onSale).sort((a, b) => a[1].stepDate > b[1].stepDate ? 1 : a[1].stepDate < b[1].stepDate ? -1 : 0)[0];
 
-                    let id = Object.keys(sortedObj)[0];
-                    let options = sortedObj[id];
                     // console.dir(`time: ${currentTime}, stepTime: ${options.stepDate}, bool: ${currentTime >= options.stepDate}`);
                     if (currentTime >= options.stepDate && currentTime <= options.endDate && options.step < options.steps) {
                         self.changePrice(id, options);
